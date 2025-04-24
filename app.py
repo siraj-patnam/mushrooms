@@ -50,17 +50,44 @@ def main():
         st.write("Target distribution:")
         st.write(df['class'].value_counts())
     
-    # Feature selection
+    # Feature selection - improved with categorized checkboxes
     all_features = df.columns[1:].tolist()  # Exclude class column
-    selected_features = st.sidebar.multiselect(
-        "Select features to include", 
-        options=all_features,
-        default=all_features[:5]
-    )
+    
+    # Group features by category for easier selection
+    feature_categories = {
+        "Cap Features": ["cap-shape", "cap-surface", "cap-color", "bruises"],
+        "Gill Features": ["gill-attachment", "gill-spacing", "gill-size", "gill-color"],
+        "Stalk Features": ["stalk-shape", "stalk-root", "stalk-surface-above-ring", 
+                           "stalk-surface-below-ring", "stalk-color-above-ring", 
+                           "stalk-color-below-ring"],
+        "Other Features": ["veil-type", "veil-color", "ring-number", "ring-type", 
+                          "spore-print-color", "population", "habitat", "odor"]
+    }
+    
+    # Create a feature selector with expandable categories
+    st.sidebar.subheader("Feature Selection")
+    
+    # Initialize selected_features with all features
+    selected_features = all_features.copy()  # Default to all features
+    
+    # Option to select all or clear all
+    select_all = st.sidebar.checkbox("Select All Features", True)
+    if not select_all:
+        selected_features = []  # If "Select All" is unchecked, start with empty list
+        
+        # Show feature categories as expandable sections
+        for category, features in feature_categories.items():
+            with st.sidebar.expander(f"{category} ({len(features)})"):
+                for feature in features:
+                    if st.checkbox(feature, value=False, key=f"feat_{feature}"):
+                        selected_features.append(feature)
     
     if len(selected_features) == 0:
         st.error("Please select at least one feature")
         return
+    
+    # Display the number of selected features
+    st.sidebar.write(f"Selected {len(selected_features)} out of {len(all_features)} features")
     
     # Split the data
     X = df[selected_features]
@@ -134,75 +161,80 @@ def main():
     
     # Train the model
     if st.sidebar.button("Train and Evaluate"):
-        st.subheader(f"Classifier: {classifier_name}")
-        clf.fit(X_train, y_train)
-        y_pred = clf.predict(X_test)
-        
-        # Model accuracy
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred)
-        recall = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-        
-        st.write(f"Accuracy: {accuracy:.4f}")
-        st.write(f"Precision: {precision:.4f}")
-        st.write(f"Recall: {recall:.4f}")
-        st.write(f"F1 Score: {f1:.4f}")
-        
-        # Plot confusion matrix
-        st.subheader("Confusion Matrix")
-        cm = confusion_matrix(y_test, y_pred)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                   xticklabels=class_names, yticklabels=class_names)
-        plt.ylabel('True label')
-        plt.xlabel('Predicted label')
-        st.pyplot(fig)
-        
-        # ROC Curve
-        st.subheader("ROC Curve")
-        if hasattr(clf, "predict_proba"):
-            y_prob = clf.predict_proba(X_test)[:, 1]
-            fpr, tpr, _ = roc_curve(y_test, y_prob)
-            roc_auc = auc(fpr, tpr)
+        with st.spinner("Training model and generating evaluation metrics..."):
+            st.subheader(f"Classifier: {classifier_name}")
+            clf.fit(X_train, y_train)
+            y_pred = clf.predict(X_test)
             
-            fig, ax = plt.subplots(figsize=(8, 6))
-            plt.plot(fpr, tpr, label=f'AUC = {roc_auc:.3f}')
-            plt.plot([0, 1], [0, 1], 'k--')
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.title('ROC Curve')
-            plt.legend(loc='lower right')
-            st.pyplot(fig)
-        else:
-            st.write("ROC curve not available for this model with these settings")
-        
-        # Precision-Recall Curve
-        st.subheader("Precision-Recall Curve")
-        if hasattr(clf, "predict_proba"):
-            precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_prob)
-            pr_auc = auc(recall_curve, precision_curve)
+            # Model accuracy
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred)
+            recall = recall_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred)
             
+            # Display metrics in a nicer format
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Accuracy", f"{accuracy:.4f}")
+                st.metric("Precision", f"{precision:.4f}")
+            with col2:
+                st.metric("Recall", f"{recall:.4f}")
+                st.metric("F1 Score", f"{f1:.4f}")
+            
+            # Plot confusion matrix
+            st.subheader("Confusion Matrix")
+            cm = confusion_matrix(y_test, y_pred)
             fig, ax = plt.subplots(figsize=(8, 6))
-            plt.plot(recall_curve, precision_curve, label=f'AUC = {pr_auc:.3f}')
-            plt.xlabel('Recall')
-            plt.ylabel('Precision')
-            plt.title('Precision-Recall Curve')
-            plt.legend(loc='lower left')
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                       xticklabels=class_names, yticklabels=class_names)
+            plt.ylabel('True label')
+            plt.xlabel('Predicted label')
             st.pyplot(fig)
-        else:
-            st.write("Precision-Recall curve not available for this model with these settings")
-        
-        # Feature importance for Random Forest
-        if classifier_name == "Random Forest":
-            st.subheader("Feature Importance")
-            feature_imp = pd.Series(clf.feature_importances_, index=selected_features).sort_values(ascending=False)
-            fig, ax = plt.subplots(figsize=(10, 6))
-            feature_imp.plot.bar()
-            plt.xlabel('Features')
-            plt.ylabel('Importance')
-            plt.title('Feature Importance')
-            st.pyplot(fig)
+            
+            # ROC Curve
+            st.subheader("ROC Curve")
+            if hasattr(clf, "predict_proba"):
+                y_prob = clf.predict_proba(X_test)[:, 1]
+                fpr, tpr, _ = roc_curve(y_test, y_prob)
+                roc_auc = auc(fpr, tpr)
+                
+                fig, ax = plt.subplots(figsize=(8, 6))
+                plt.plot(fpr, tpr, label=f'AUC = {roc_auc:.3f}')
+                plt.plot([0, 1], [0, 1], 'k--')
+                plt.xlabel('False Positive Rate')
+                plt.ylabel('True Positive Rate')
+                plt.title('ROC Curve')
+                plt.legend(loc='lower right')
+                st.pyplot(fig)
+            else:
+                st.write("ROC curve not available for this model with these settings")
+            
+            # Precision-Recall Curve
+            st.subheader("Precision-Recall Curve")
+            if hasattr(clf, "predict_proba"):
+                precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_prob)
+                pr_auc = auc(recall_curve, precision_curve)
+                
+                fig, ax = plt.subplots(figsize=(8, 6))
+                plt.plot(recall_curve, precision_curve, label=f'AUC = {pr_auc:.3f}')
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.title('Precision-Recall Curve')
+                plt.legend(loc='lower left')
+                st.pyplot(fig)
+            else:
+                st.write("Precision-Recall curve not available for this model with these settings")
+            
+            # Feature importance for Random Forest
+            if classifier_name == "Random Forest":
+                st.subheader("Feature Importance")
+                feature_imp = pd.Series(clf.feature_importances_, index=selected_features).sort_values(ascending=False)
+                fig, ax = plt.subplots(figsize=(10, 6))
+                feature_imp.plot.bar()
+                plt.xlabel('Features')
+                plt.ylabel('Importance')
+                plt.title('Feature Importance')
+                st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
