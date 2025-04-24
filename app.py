@@ -478,7 +478,7 @@ def prediction_page():
                         # Store the selected value (encoded)
                         encoded_value = inverse_mapping.get(feature, {}).get(selected_value, 0)
                         user_input[feature] = encoded_value
-    
+        
         # Add a prominent, clearly visible submit button
         st.markdown("### Submit Prediction")
         submit_button = st.form_submit_button(
