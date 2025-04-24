@@ -21,7 +21,8 @@ def main():
         st.session_state.feature_encoders = {}
     if 'selected_features' not in st.session_state:
         st.session_state.selected_features = []
-    
+    if 'prediction_made' not in st.session_state:
+        st.session_state.prediction_made = False
     # Page navigation
     page = st.sidebar.radio("Navigate", ["Train Model", "Make Prediction"])
     
@@ -520,6 +521,9 @@ def prediction_page():
         else:
             st.error(f"This mushroom is predicted to be **{result}** with {probability_value:.2%} confidence.")
             st.warning("⚠️ **CAUTION**: Never eat a mushroom based solely on an app's prediction! Always consult with a mushroom expert.")
+
+        if st.button("Make Another Prediction"):
+            st.session_state.prediction_made = False
         
         # Create a nice visualization of the prediction
         fig, ax = plt.subplots(figsize=(10, 2))
