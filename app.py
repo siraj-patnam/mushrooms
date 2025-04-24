@@ -453,34 +453,39 @@ def prediction_page():
         "Other Features": [f for f in selected_features if not any(f.startswith(p) for p in ["cap", "gill", "stalk"])]
     }
     
-    # Create input form for user to select feature values
-    with st.form(key='prediction_form'):
-        # Initialize an empty dictionary to store user inputs
-        user_input = {}
-        
-        # Create form inputs for each feature group
-        for group_name, features in feature_groups.items():
-            if features:  # Only show groups that have features
-                st.subheader(group_name)
-                cols = st.columns(min(3, len(features)))  # Up to 3 columns
-                
-                for i, feature in enumerate(features):
-                    with cols[i % 3]:
-                        # Get possible values for this feature
-                        possible_values = feature_values.get(feature, ['Unknown'])
-                        
-                        # Create a selectbox for the feature
-                        selected_value = st.selectbox(
-                            f"{feature.replace('-', ' ').title()}",
-                            possible_values
-                        )
-                        
-                        # Store the selected value (encoded)
-                        encoded_value = inverse_mapping.get(feature, {}).get(selected_value, 0)
-                        user_input[feature] = encoded_value
-        
-        # Submit button
-        submit_button = st.form_submit_button(label='Predict')
+# Create input form for user to select feature values
+with st.form(key='prediction_form'):
+    # Initialize an empty dictionary to store user inputs
+    user_input = {}
+    
+    # Create form inputs for each feature group
+    for group_name, features in feature_groups.items():
+        if features:  # Only show groups that have features
+            st.subheader(group_name)
+            cols = st.columns(min(3, len(features)))  # Up to 3 columns
+            
+            for i, feature in enumerate(features):
+                with cols[i % 3]:
+                    # Get possible values for this feature
+                    possible_values = feature_values.get(feature, ['Unknown'])
+                    
+                    # Create a selectbox for the feature
+                    selected_value = st.selectbox(
+                        f"{feature.replace('-', ' ').title()}",
+                        possible_values
+                    )
+                    
+                    # Store the selected value (encoded)
+                    encoded_value = inverse_mapping.get(feature, {}).get(selected_value, 0)
+                    user_input[feature] = encoded_value
+    
+    # Add a prominent, clearly visible submit button
+    st.markdown("### Submit Prediction")
+    submit_button = st.form_submit_button(
+        label='PREDICT MUSHROOM TOXICITY', 
+        use_container_width=True,
+        type="primary"  # Makes the button more prominent
+    )
     
     # Make prediction when form is submitted
     if submit_button:
