@@ -171,7 +171,8 @@ def train_model_page():
         if st.checkbox("Show Categorical Value Meanings"):
             st.write("**Categorical Value Meanings**")
             selected_feature = st.selectbox("Select feature to view its categorical values:", 
-                                           list(categorical_meanings.keys()))
+                                           list(categorical_meanings.keys()),
+                                           key="categorical_meaning_selector")
             
             if selected_feature in categorical_meanings:
                 meanings_df = pd.DataFrame.from_dict(
@@ -211,10 +212,10 @@ def train_model_page():
         selected_features = []  # If "Select All" is unchecked, start with empty list
         
         # Show feature categories as expandable sections
-        for category, features in feature_categories.items():
+        for i, (category, features) in enumerate(feature_categories.items()):
             with st.sidebar.expander(f"{category} ({len(features)})"):
-                for feature in features:
-                    if st.checkbox(feature, value=False, key=f"feat_{feature}"):
+                for j, feature in enumerate(features):
+                    if st.checkbox(feature, value=False, key=f"train_feat_{i}_{j}"):
                         selected_features.append(feature)
     
     if len(selected_features) == 0:
@@ -453,38 +454,41 @@ def prediction_page():
         "Other Features": [f for f in selected_features if not any(f.startswith(p) for p in ["cap", "gill", "stalk"])]
     }
     
-    # Create input form for user to select feature values
-    with st.form(key='prediction_form'):
-        # Initialize an empty dictionary to store user inputs
-        user_input = {}
-        
+    # Initialize empty dictionary to store user inputs
+    user_input = {}
+    
+    # Create a proper form with submit button
+    with st.form("prediction_form"):
         # Create form inputs for each feature group
-        for group_name, features in feature_groups.items():
+        for group_idx, (group_name, features) in enumerate(feature_groups.items()):
             if features:  # Only show groups that have features
                 st.subheader(group_name)
-                cols = st.columns(min(3, len(features)))  # Up to 3 columns
                 
-                for i, feature in enumerate(features):
-                    with cols[i % 3]:
+                # Create a grid of up to 3 columns
+                num_cols = min(3, len(features))
+                cols = st.columns(num_cols)
+                
+                for feat_idx, feature in enumerate(features):
+                    col_idx = feat_idx % num_cols
+                    with cols[col_idx]:
                         # Get possible values for this feature
                         possible_values = feature_values.get(feature, ['Unknown'])
                         
-                        # Create a selectbox for the feature
+                        # Create a selectbox for the feature with a unique key
                         selected_value = st.selectbox(
                             f"{feature.replace('-', ' ').title()}",
-                            possible_values
+                            possible_values,
+                            key=f"pred_select_{group_idx}_{feat_idx}"
                         )
                         
                         # Store the selected value (encoded)
                         encoded_value = inverse_mapping.get(feature, {}).get(selected_value, 0)
                         user_input[feature] = encoded_value
         
-        # Add a prominent, clearly visible submit button
-        st.markdown("### Submit Prediction")
+        # Add a prominent submit button outside the feature loops
         submit_button = st.form_submit_button(
-            label='PREDICT MUSHROOM TOXICITY', 
-            use_container_width=True,
-            type="primary"  # Makes the button more prominent
+            label="PREDICT MUSHROOM TOXICITY",
+            use_container_width=True
         )
     
     # Make prediction when form is submitted
