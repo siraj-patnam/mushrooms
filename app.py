@@ -28,23 +28,33 @@ def main():
             'ring-type', 'spore-print-color', 'population', 'habitat'
         ]
         
-        df = pd.read_csv(url, names=column_names)
+        # Load raw data for display
+        raw_df = pd.read_csv(url, names=column_names)
         
-        # Encode categorical features
+        # Create encoded copy for model
+        df = raw_df.copy()
         le = LabelEncoder()
         for col in df.columns:
             df[col] = le.fit_transform(df[col])
             
-        return df
+        return raw_df, df
 
-    df = load_data()
+    raw_df, df = load_data()
     
     class_names = ['edible', 'poisonous']
     
     # Display dataset overview
     if st.sidebar.checkbox("Show Dataset Information", False):
         st.subheader("Mushroom Dataset Overview")
+        
+        # Show raw data before encoding
+        st.write("**Original Raw Data (Before Encoding)**")
+        st.write(raw_df.head())
+        
+        # Show encoded data
+        st.write("**Encoded Data (Used for Training)**")
         st.write(df.head())
+        
         st.write("Shape:", df.shape)
         st.write("Feature names:", df.columns[:-1].tolist())
         st.write("Target distribution:")
