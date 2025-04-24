@@ -1,6 +1,7 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -8,6 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, roc_curve, precision_recall_curve, auc
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import seaborn as sns
 
 def main():
     st.title("Are your mushrooms poisonous?")
@@ -15,7 +17,7 @@ def main():
 
     @st.cache_data(persist=True)
     def load_data():
-        # Direct data loading from UCI
+        # Direct data loading instead of using ucimlrepo
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/mushroom/agaricus-lepiota.data"
         column_names = [
             'class', 'cap-shape', 'cap-surface', 'cap-color', 'bruises', 'odor',
@@ -26,28 +28,14 @@ def main():
             'ring-type', 'spore-print-color', 'population', 'habitat'
         ]
         
-        try:
-            df = pd.read_csv(url, names=column_names)
+        df = pd.read_csv(url, names=column_names)
+        
+        # Encode categorical features
+        le = LabelEncoder()
+        for col in df.columns:
+            df[col] = le.fit_transform(df[col])
             
-            # Encode categorical features
-            le = LabelEncoder()
-            for col in df.columns:
-                df[col] = le.fit_transform(df[col])
-                
-            return df
-        except Exception as e:
-            st.error(f"Error loading data: {e}")
-            # Fallback - load sample data if the URL fails
-            st.warning("Loading sample data instead...")
-            # Create a small sample dataset
-            sample_data = {
-                'class': [0, 1, 0, 1, 0] * 20,
-                'cap-shape': [0, 1, 2, 0, 1] * 20,
-                'cap-surface': [0, 1, 0, 1, 2] * 20,
-                'cap-color': [0, 1, 2, 3, 0] * 20,
-                'odor': [0, 1, 0, 2, 1] * 20,
-            }
-            return pd.DataFrame(sample_data)
+        return df
 
     df = load_data()
     
@@ -58,6 +46,7 @@ def main():
         st.subheader("Mushroom Dataset Overview")
         st.write(df.head())
         st.write("Shape:", df.shape)
+        st.write("Feature names:", df.columns[:-1].tolist())
         st.write("Target distribution:")
         st.write(df['class'].value_counts())
     
@@ -66,7 +55,7 @@ def main():
     selected_features = st.sidebar.multiselect(
         "Select features to include", 
         options=all_features,
-        default=all_features[:3] if len(all_features) > 3 else all_features
+        default=all_features[:5]
     )
     
     if len(selected_features) == 0:
@@ -104,8 +93,8 @@ def main():
             params["gamma"] = gamma
             
         elif clf_name == "Random Forest":
-            n_estimators = st.sidebar.slider("n_estimators", 10, 200, 100, 10)
-            max_depth = st.sidebar.slider("max_depth", 2, 15, 5, 1)
+            n_estimators = st.sidebar.slider("n_estimators", 10, 500, 100, 10)
+            max_depth = st.sidebar.slider("max_depth", 2, 20, 5, 1)
             criterion = st.sidebar.selectbox("criterion", ("gini", "entropy"))
             params["n_estimators"] = n_estimators
             params["max_depth"] = max_depth
@@ -145,73 +134,75 @@ def main():
     
     # Train the model
     if st.sidebar.button("Train and Evaluate"):
-        with st.spinner("Training model..."):
-            st.subheader(f"Classifier: {classifier_name}")
-            clf.fit(X_train, y_train)
-            y_pred = clf.predict(X_test)
+        st.subheader(f"Classifier: {classifier_name}")
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        
+        # Model accuracy
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        
+        st.write(f"Accuracy: {accuracy:.4f}")
+        st.write(f"Precision: {precision:.4f}")
+        st.write(f"Recall: {recall:.4f}")
+        st.write(f"F1 Score: {f1:.4f}")
+        
+        # Plot confusion matrix
+        st.subheader("Confusion Matrix")
+        cm = confusion_matrix(y_test, y_pred)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                   xticklabels=class_names, yticklabels=class_names)
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        st.pyplot(fig)
+        
+        # ROC Curve
+        st.subheader("ROC Curve")
+        if hasattr(clf, "predict_proba"):
+            y_prob = clf.predict_proba(X_test)[:, 1]
+            fpr, tpr, _ = roc_curve(y_test, y_prob)
+            roc_auc = auc(fpr, tpr)
             
-            # Model accuracy
-            accuracy = accuracy_score(y_test, y_pred)
-            precision = precision_score(y_test, y_pred)
-            recall = recall_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(8, 6))
+            plt.plot(fpr, tpr, label=f'AUC = {roc_auc:.3f}')
+            plt.plot([0, 1], [0, 1], 'k--')
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.title('ROC Curve')
+            plt.legend(loc='lower right')
+            st.pyplot(fig)
+        else:
+            st.write("ROC curve not available for this model with these settings")
+        
+        # Precision-Recall Curve
+        st.subheader("Precision-Recall Curve")
+        if hasattr(clf, "predict_proba"):
+            precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_prob)
+            pr_auc = auc(recall_curve, precision_curve)
             
-            # Display metrics
-            metrics_col1, metrics_col2 = st.columns(2)
-            with metrics_col1:
-                st.metric("Accuracy", f"{accuracy:.4f}")
-                st.metric("Precision", f"{precision:.4f}")
-            with metrics_col2:
-                st.metric("Recall", f"{recall:.4f}")
-                st.metric("F1 Score", f"{f1:.4f}")
-            
-            # Confusion Matrix
-            st.subheader("Confusion Matrix")
-            cm = confusion_matrix(y_test, y_pred)
-            cm_df = pd.DataFrame(cm, 
-                                index=class_names, 
-                                columns=class_names)
-            st.table(cm_df)
-            
-            # ROC and Precision-Recall data
-            if hasattr(clf, "predict_proba"):
-                y_prob = clf.predict_proba(X_test)[:, 1]
-                
-                # ROC data
-                fpr, tpr, _ = roc_curve(y_test, y_prob)
-                roc_auc = auc(fpr, tpr)
-                
-                # Create ROC curve data for plotting
-                roc_data = pd.DataFrame({
-                    'False Positive Rate': fpr,
-                    'True Positive Rate': tpr
-                })
-                
-                st.subheader(f"ROC Curve (AUC = {roc_auc:.3f})")
-                st.line_chart(roc_data.set_index('False Positive Rate'))
-                
-                # Precision-Recall data
-                precision_curve, recall_curve, _ = precision_recall_curve(y_test, y_prob)
-                pr_auc = auc(recall_curve, precision_curve)
-                
-                # Create Precision-Recall curve data for plotting
-                pr_data = pd.DataFrame({
-                    'Recall': recall_curve,
-                    'Precision': precision_curve
-                })
-                
-                st.subheader(f"Precision-Recall Curve (AUC = {pr_auc:.3f})")
-                st.line_chart(pr_data.set_index('Recall'))
-            
-            # Feature importance for Random Forest
-            if classifier_name == "Random Forest":
-                st.subheader("Feature Importance")
-                feature_imp = pd.DataFrame({
-                    'Feature': selected_features,
-                    'Importance': clf.feature_importances_
-                }).sort_values('Importance', ascending=False)
-                
-                st.bar_chart(feature_imp.set_index('Feature'))
+            fig, ax = plt.subplots(figsize=(8, 6))
+            plt.plot(recall_curve, precision_curve, label=f'AUC = {pr_auc:.3f}')
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.title('Precision-Recall Curve')
+            plt.legend(loc='lower left')
+            st.pyplot(fig)
+        else:
+            st.write("Precision-Recall curve not available for this model with these settings")
+        
+        # Feature importance for Random Forest
+        if classifier_name == "Random Forest":
+            st.subheader("Feature Importance")
+            feature_imp = pd.Series(clf.feature_importances_, index=selected_features).sort_values(ascending=False)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            feature_imp.plot.bar()
+            plt.xlabel('Features')
+            plt.ylabel('Importance')
+            plt.title('Feature Importance')
+            st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
