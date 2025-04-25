@@ -556,7 +556,7 @@ def prediction_page():
     
     if st.button("Make Another Prediction"):
             st.session_state.prediction_made = False
-            input_df = pd.DataFrame([user_input])
+            input_df = 0
 
 if __name__ == '__main__':
     main()
