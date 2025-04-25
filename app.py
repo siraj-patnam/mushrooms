@@ -522,8 +522,7 @@ def prediction_page():
             st.error(f"This mushroom is predicted to be **{result}** with {probability_value:.2%} confidence.")
             st.warning("⚠️ **CAUTION**: Never eat a mushroom based solely on an app's prediction! Always consult with a mushroom expert.")
 
-        if st.button("Make Another Prediction"):
-            st.session_state.prediction_made = False
+        
         
         # Create a nice visualization of the prediction
         fig, ax = plt.subplots(figsize=(10, 2))
@@ -554,6 +553,9 @@ def prediction_page():
             sns.barplot(x='Importance', y='Feature', data=top_features, palette='viridis')
             plt.title(f'Top {top_n} Features for This Prediction')
             st.pyplot(fig)
+    
+    if st.button("Make Another Prediction"):
+            st.session_state.prediction_made = False
 
 if __name__ == '__main__':
     main()
